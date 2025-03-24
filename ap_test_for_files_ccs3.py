@@ -8,8 +8,8 @@ import subprocess
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
-import os
 from pexpect import pxssh
+import os
 
 def ping_host(host):
     """Ping the host to check if it is reachable."""
@@ -44,14 +44,6 @@ def ssh_and_run_commands(host, files):
     except Exception as e:
         print(f"Failed to SSH into {host}: {e}")
 
-def check_host_reachability(host):
-    """Check if the host is reachable."""
-    return ping_host(host)
-
-def check_host_file(host):
-    """Check if the specific file exists on the host."""
-    ssh_and_run_commands(host)
-
 def process_host(host, files):
     """Process a single host: ping and check files."""
     if ping_host(host):
@@ -61,9 +53,17 @@ def process_host(host, files):
         return (host, 'bad')
 
 def read_hosts_from_csv(csv_file):
-    with open(csv_file, mode='r') as file:
-        csv_reader = csv.DictReader(file, delimiter=',')
-        return [row['SNMP_Host'] for row in csv_reader]
+    """Read hosts from the CSV file."""
+    try:
+        with open(csv_file, mode='r') as file:
+            csv_reader = csv.DictReader(file, delimiter=',')
+            return [row['SNMP_Host'] for row in csv_reader]
+    except FileNotFoundError:
+        print(f"Error: The file {csv_file} was not found.")
+        exit(1)
+    except Exception as e:
+        print(f"Error reading CSV file {csv_file}: {e}")
+        exit(1)
 
 def process_hosts(hosts, files):
     good_hosts = []
@@ -89,6 +89,10 @@ def print_hosts(good_hosts, bad_hosts):
         print(host)
 
 def main(csv_file, files):
+    password = os.getenv('SSH_PASSWORD')
+    if not password:
+        raise ValueError("No SSH password found. Please set the SSH_PASSWORD environment variable.")
+
     hosts = read_hosts_from_csv(csv_file)
     good_hosts, bad_hosts = process_hosts(hosts, files)
     print_hosts(good_hosts, bad_hosts)
