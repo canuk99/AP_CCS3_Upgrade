@@ -70,7 +70,7 @@ def main(csv_file, file_path1, file_path2):
 
     hosts = read_hosts_from_csv(csv_file)
 
-    with ThreadPoolExecutor(max_workers=12) as executor:
+    with ThreadPoolExecutor(max_workers=40) as executor:
         future_to_host = {executor.submit(process_host, host, file_path1, file_path2): host for host in hosts}
         for future in as_completed(future_to_host):
             host, status = future.result()

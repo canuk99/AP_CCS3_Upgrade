@@ -69,7 +69,7 @@ def process_hosts(hosts, files):
     good_hosts = []
     bad_hosts = []
 
-    with ThreadPoolExecutor(max_workers=12) as executor:
+    with ThreadPoolExecutor(max_workers=40) as executor:
         future_to_host = {executor.submit(process_host, host, files): host for host in hosts}
         for future in as_completed(future_to_host):
             host, status = future.result()

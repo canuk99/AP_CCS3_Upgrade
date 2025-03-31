@@ -27,7 +27,7 @@ def ping_host(host):
 def push_upgrade(host):
     """Push upgrade script to the host using SSH."""
     try:
-        client = pxssh.pxssh()
+        client = pxssh.pxssh(timeout=600)  # Set SSH timeout to 5 minutes (300 seconds)
         username = 'root'
         password = os.getenv('SSHPASS')
         if not password:
@@ -41,20 +41,58 @@ def push_upgrade(host):
         cd_command = "cd /tmp"
         client.sendline(cd_command)
         client.prompt()
+        time.sleep(2) 
         output = client.before.decode('utf-8').splitlines()
         output = [line.strip() for line in output if line.strip()]
-        print(f"Output from cd command: {output}")
-
-        # Execute the chmod command
-        chmod_command = "chmod 754 /tmp/yocto_ap6_upgrade.sh"
-        client.sendline(chmod_command)
+        #print(f"Output from cd /tmp: {output}")
+        # Verify if the file exists before changing permissions
+        web_command = "/onramp/bin/web_ctrl set_tcp_config -t 0 -m 0 -s 192.168.0.1 -p 5051 -h 192.168.30.107"
+        client.sendline(web_command)
+        client.prompt()
+        time.sleep(5)  # Increase delay to ensure the command has enough time to execute
+        output = client.before.decode('utf-8').splitlines()
+        output = [line.strip() for line in output if line.strip()]
+        #print(f"Output before chmod command: {output}")
+        # Verify the current directory
+        pwd_command = "pwd"
+        client.sendline(pwd_command)
         client.prompt()
         output = client.before.decode('utf-8').splitlines()
         output = [line.strip() for line in output if line.strip()]
-        print(f"Output from chmod command: {output}")
+        #print(f"Output from pwd command: {output}")
+
+        # Verify if the file exists before changing permissions
+        verify_command = "ls -l /tmp/yocto_ap6_upgrade.sh"
+        client.sendline(verify_command)
+        client.prompt()
+        time.sleep(5)  # Increase delay to ensure the command has enough time to execute
+        output = client.before.decode('utf-8').splitlines()
+        output = [line.strip() for line in output if line.strip()]
+        #print(f"Output before chmod command: {output}")
+
+        # Check if permissions need to be changed
+        if len(output) > 1 and '-rwxr-xr--' not in output[1]:
+            # Execute the chmod command
+            chmod_command = "chmod 754 /tmp/yocto_ap6_upgrade.sh"
+            client.sendline(chmod_command)
+            client.prompt()
+            time.sleep(2)  # Increase delay to ensure the command has enough time to execute
+            output = client.before.decode('utf-8').splitlines()
+            output = [line.strip() for line in output if line.strip()]
+            #print(f"Output from chmod command: {output}")
+
+            # Verify if the file permissions were changed
+            client.sendline(verify_command)
+            client.prompt()
+            output = client.before.decode('utf-8').splitlines()
+            output = [line.strip() for line in output if line.strip()]
+            print(f"Output after chmod command: {output}")
+        else:
+            print(" ")
+            #print("Permissions are already set correctly or file does not exist.")
 
         # Execute the upgrade script with the argument
-        command = "./yocto_ap6_upgrade.sh ap5_fw_10_5_5_135352_135354M.dist"
+        command = "echo ./yocto_ap6_upgrade.sh ap5_fw_10_5_5_135352_135354M.dist"
         client.sendline(command)
         client.prompt()
         output = client.before.decode('utf-8').splitlines()
@@ -102,7 +140,7 @@ def process_hosts(hosts):
     good_hosts = []
     bad_hosts = []
 
-    with ThreadPoolExecutor(max_workers=12) as executor:
+    with ThreadPoolExecutor(max_workers=25) as executor:
         future_to_host = {executor.submit(process_host, host): host for host in hosts}
         for future in as_completed(future_to_host):
             host, status = future.result()
