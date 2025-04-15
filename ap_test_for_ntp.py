@@ -1,7 +1,66 @@
 #!/usr/bin/env python3
+"""
+This script is designed to ping hosts, SSH into them, retrieve NTP server information, 
+validate the IP addresses, and log the results. It processes multiple hosts concurrently 
+and reads host information from a CSV file.
+Modules Used:
+--------------
+- csv: To read host information from a CSV file.
+- subprocess: To ping hosts and check their reachability.
+- argparse: To handle command-line arguments.
+- logging: To log messages for debugging and tracking.
+- concurrent.futures: To process multiple hosts concurrently.
+- pexpect.pxssh: To handle SSH connections.
+- os: To access environment variables.
+- re: To validate IP addresses using regular expressions.
+- platform: To determine the operating system for ping command compatibility.
+Functions:
+----------
+1. ping_host(host):
+    - Pings the given host to check if it is reachable.
+    - Returns True if the host is reachable, otherwise False.
+2. ssh_and_run_commands(host):
+    - SSH into the given host, run a command to retrieve NTP server information, 
+      and validate the IP addresses.
+    - Logs valid and invalid IP addresses and handles errors during SSH login.
+3. process_host(host):
+    - Combines ping and SSH operations for a single host.
+    - Returns a tuple (host, status) where status is 'good' if the host is reachable 
+      and SSH commands succeed, otherwise 'bad'.
+4. read_hosts_from_csv(csv_file):
+    - Reads host information from a CSV file.
+    - Expects a column named 'SNMP_Host' containing hostnames or IP addresses.
+    - Returns a list of hosts.
+5. process_hosts(hosts):
+    - Processes all hosts concurrently using a thread pool.
+    - Returns two lists: good_hosts (reachable and processed successfully) 
+      and bad_hosts (unreachable or failed processing).
+6. print_hosts(good_hosts, bad_hosts):
+    - Prints and logs the lists of good and bad hosts.
+7. main(csv_file):
+    - Main function to orchestrate the script's operations.
+    - Reads the CSV file, processes the hosts, and prints the results.
+Usage:
+------
+- Run the script from the command line with a CSV file as an argument:
+    ./ap_test_for_ntp.py <path_to_csv_file>
+- The CSV file must contain a column named 'SNMP_Host'.
+- Set the SSH password in the environment variable 'SSH_PASSWORD' before running the script:
+    export SSH_PASSWORD=your_password
+Logging:
+--------
+- Logging is disabled by default (set to CRITICAL level).
+- Modify the logging level in the main() function to enable logging for debugging.
+Concurrency:
+------------
+- The script uses a ThreadPoolExecutor with a maximum of 40 workers to process hosts concurrently.
+Error Handling:
+---------------
+- Handles errors during CSV file reading, SSH login, and command execution.
+- Logs errors and warnings for invalid IPs or missing NTP server information.
+"""
 #
-# This tests to see if the files are there.
-import csv
+
 import subprocess
 import argparse
 import logging
@@ -10,6 +69,7 @@ from pexpect import pxssh
 import os
 import re
 import platform
+import csv
 
 def ping_host(host):
     """Ping the host to check if it is reachable."""
@@ -96,19 +156,20 @@ def read_hosts_from_csv(csv_file):
     """Read hosts from the CSV file."""
     try:
         with open(csv_file, mode='r') as file:
-            csv_reader = csv.DictReader(file, delimiter=',')
-            for row in csv_reader:
-                if 'SNMP_Host' not in row:
-                    raise ValueError(f"The CSV file {csv_file} does not contain the required 'SNMP_Host' column.")
-                return [row['SNMP_Host'] for row in csv_reader]
+            csv_reader = csv.DictReader(file)
+            if 'SNMP_Host' not in csv_reader.fieldnames:
+                raise ValueError(f"The CSV file {csv_file} does not contain the required 'SNMP_Host' column.")
+            return [row['SNMP_Host'] for row in csv_reader]
     except FileNotFoundError:
-            logging.error(f"Error: The file {csv_file} was not found.")
-            print(f"Error: The file {csv_file} was not found.")
-            exit(1)
+        logging.error(f"Error: The file {csv_file} was not found.")
+        print(f"Error: The file {csv_file} was not found.")
+        exit(1)
     except Exception as e:
-            logging.error(f"Error reading CSV file {csv_file}: {e}")
-            print(f"Error reading CSV file {csv_file}: {e}")
-            exit(1)
+        logging.error(f"Error reading CSV file {csv_file}: {e}")
+        print(f"Error reading CSV file {csv_file}: {e}")
+        exit(1)
+        print(f"Error reading CSV file {csv_file}: {e}")
+        exit(1)
     except Exception as e:
         print(f"Error reading CSV file {csv_file}: {e}")
         exit(1)
